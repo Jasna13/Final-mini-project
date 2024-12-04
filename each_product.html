@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product Details | MediCare</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Navbar -->
+  <header>
+    <div class="navbar">
+      <h1 class="logo">MediCare</h1>
+      <nav>
+        <ul>
+          <li><a href="index.php">Home</a></li>
+          <li><a href="products.php">Products</a></li>
+          <li><a href="aboutus.html">About Us</a></li>
+          <li><a href="contact.php">Contact</a></li>
+          <li><a href="Add_to_cart.php">Add to Cart</a></li>
+          <li><a href="Profile.php">Profile</a></li>
+          <?php if (isset($_SESSION['uid'])): ?>
+              <li><a href="logout.php">Logout</a></li>
+          <?php else: ?>
+              <li><a href="http://localhost/Project/medicare/medicare-main/Login/login.php">Login</a></li>
+          <?php endif; ?>
+      </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Product Details Section -->
+  <section class="product-details">
+    <h2 id="productName"></h2>
+    <img id="productImage" src="" alt="" style="width: 200px; height: 200px;" />
+    <p id="productPrice"></p>
+    <p id="productDescription"></p>
+
+    <h3>Place Order</h3>
+    <form id="orderForm">
+      <label for="quantity">Quantity:</label>
+      <input type="number" id="quantity" name="quantity" min="1" required>
+      <button type="submit">Place Order</button>
+    </form>
+
+    <div id="paymentOptions" style="display:none;">
+      <h3>Payment Options</h3>
+      <p>Select your payment method:</p>
+      <button class="btn">Credit/Debit Card</button>
+      <button class="btn">PayPal</button>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2024 MediCare. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // Function to get URL parameters
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
+    }
+
+    // On page load
+    document.addEventListener('DOMContentLoaded', function() {
+      const productName = getQueryParam('product');
+      const productPrice = getQueryParam('price');
+
+      // Populate product details
+      document.getElementById('productName').textContent = productName;
+      document.getElementById('productPrice').textContent = "Price: $" + parseFloat(productPrice).toFixed(2);
+      
+      // You can also fetch product image and description from the server using AJAX or fetch if necessary
+      document.getElementById('productImage').src = "default-product-image.png"; // Change this to your image source
+      document.getElementById('productDescription').textContent = "Description of " + productName; // Update with actual description
+
+      // Handle order form submission
+      document.getElementById('orderForm').addEventListener('submit', function(e) {
+        e.preventDefault(); // Prevent form submission
+        const quantity = document.getElementById('quantity').value;
+        alert(`Order placed for ${quantity} of ${productName}.`);
+        
+        // Show payment options after placing the order
+        document.getElementById('paymentOptions').style.display = 'block';
+      });
+    });
+  </script>
+</body>
+</html>

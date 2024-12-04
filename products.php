@@ -1,402 +1,307 @@
-<?php
-// Database connection
-$conn = new mysqli('localhost', 'root', '', 'medico_shop');
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-$productToEdit = null;
-
-// Function to convert image to Base64 (Not used here, but left for reference)
-function imageToBase64($imageFile) {
-    $imageData = file_get_contents($imageFile);
-    return 'data:' . mime_content_type($imageFile) . ';base64,' . base64_encode($imageData);
-}
-
-// Handle Add Product
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'add') {
-    $name = $_POST['name'];
-    $price = $_POST['price'];
-    $stock = $_POST['stock'];
-    $category = $_POST['category'];
-    $discount = $_POST['discount'];
-    
-    // Handle image upload
-    if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
-        $image = $_FILES['image'];
-        $imagePath = 'images/' . basename($image['name']);  // Set the path where the image will be saved
-        move_uploaded_file($image['tmp_name'], $imagePath);  // Move the uploaded file to the server
-    } else {
-        $imagePath = '';  // If no image, set empty
-    }
-
-    // Check if requires_priscription is checked
-    $requires_priscription = isset($_POST['requires_priscription']) ? 1 : 0;
-    
-    // Insert into the database
-    $stmt = $conn->prepare("INSERT INTO products (name, price, stock, category, discounted_price, image, requires_priscription) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param('sdisssi', $name, $price, $stock, $category, $discount, $imagePath, $requires_priscription);
-    
-    if ($stmt->execute()) {
-        echo "Product added successfully!";
-    } else {
-        echo "Error adding product: " . $stmt->error;
-    }
-}
-
-// Handle Delete Product
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
-    $productId = $_POST['id'];
-    
-    // Delete the product from the database
-    $stmt = $conn->prepare("DELETE FROM products WHERE id = ?");
-    $stmt->bind_param('i', $productId);
-    if ($stmt->execute()) {
-        echo "Product deleted successfully!";
-    } else {
-        echo "Error deleting product: " . $stmt->error;
-    }
-}
-
-// Handle Edit Product (Retrieve the product data to pre-fill the form)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit') {
-    $productId = $_POST['id'];
-    $stmt = $conn->prepare("SELECT * FROM products WHERE id = ?");
-    $stmt->bind_param('i', $productId);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    
-    if ($result->num_rows > 0) {
-        $productToEdit = $result->fetch_assoc();
-    }
-}
-
-// Handle Update Product
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update') {
-    $id = $_POST['id'];
-    $name = $_POST['name'];
-    $price = $_POST['price'];
-    $stock = $_POST['stock'];
-    $category = $_POST['category'];
-    $discount = $_POST['discount'];
-
-    // Handle image upload (if new image is uploaded)
-    if (isset($_FILES['image']) && $_FILES['image']['error'] == 0) {
-        $image = $_FILES['image'];
-        $imagePath = 'images/' . basename($image['name']);
-        move_uploaded_file($image['tmp_name'], $imagePath);
-    } else {
-        // If no new image uploaded, keep the old image path
-        $imagePath = $productToEdit['image'];
-    }
-    
-    // Check if requires_priscription is checked
-    $requires_priscription = isset($_POST['requires_priscription']) ? 1 : 0;
-
-    // Update the product in the database
-    $stmt = $conn->prepare("UPDATE products SET name = ?, price = ?, stock = ?, category = ?, discounted_price = ?, image = ?, requires_priscription = ? WHERE id = ?");
-    $stmt->bind_param('sdisssii', $name, $price, $stock, $category, $discount, $imagePath, $requires_priscription, $id);
-    
-    if ($stmt->execute()) {
-        echo "Product updated successfully!";
-        header('Location: products.php');  // Redirect after update to avoid form resubmission
-        exit;
-    } else {
-        echo "Error updating product: " . $stmt->error;
-    }
-}
-
-// Fetch products for display
-$products = [];
-$result = $conn->query("SELECT * FROM products");
-if ($result->num_rows > 0) {
-    while ($row = $result->fetch_assoc()) {
-        $products[] = $row;
-    }
-}
-?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Product Management</title>
-    <link rel="stylesheet" href="styles.css">
-    <style>
-    /* General Body Styles */
-    body {
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        background-color: #f4f4f4;
-        margin: 0;
-        padding: 0;
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Products | MediCare</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Modal styles */
+    .modal {
+      display: none; 
+      position: fixed; 
+      z-index: 1; 
+      left: 0;
+      top: 0;
+      width: 100%; 
+      height: 100%; 
+      overflow: auto; 
+      background-color: rgb(0,0,0);
+      background-color: rgba(0,0,0,0.9); 
+      padding-top: 60px;
+    }
+    .modal-content {
+      margin: auto;
+      display: block;
+      width: 80%; 
+      max-width: 700px; 
+    }
+    .close {
+      position: absolute;
+      top: 15px;
+      right: 35px;
+      color: #fff;
+      font-size: 40px;
+      font-weight: bold;
+    }
+    .close:hover,
+    .close:focus {
+      color: #bbb;
+      text-decoration: none;
+      cursor: pointer;
     }
 
-    /* Header Styles */
-    header {
-        background-color: #333;
-        color: white;
-        padding: 20px 0;
-        text-align: center;
-        font-size: 24px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    /* Style for the strikethrough original price */
+    .original-price {
+      text-decoration: line-through; 
+      color: red; 
+      margin-right: 10px;
+      font-size: 14px;
     }
 
-    header h1 {
-        margin: 0;
+    /* Style for the final discounted price */
+    .final-price {
+      font-weight: bold;
+      color: green;
+      font-size: 16px;
     }
 
-    /* Navigation Styles */
-    nav {
-        background-color: #333;
-        padding: 10px 0;
+    /* Style for the discount amount text */
+    .final-price-discount {
+      font-size: 14px;
+      color: #ff5733;  
     }
 
-    nav ul {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-        text-align: center;
+    .product-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #fff;
+      border-radius: 15px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      max-width: 600px;
+      margin: 20px auto;
+      overflow: hidden;
     }
 
-    nav ul li {
-        display: inline-block;
-        margin: 0 15px;
+    .product-image img {
+      max-width: 150px;
+      height: 150px;
+      border-radius: 10px;
+      object-fit: cover;
     }
 
-    nav ul li a {
-        color: white;
-        text-decoration: none;
-        font-size: 16px;
-        padding: 8px 12px;
-        transition: background-color 0.3s;
+    .product-info {
+      flex-grow: 1;
+      margin-left: 20px;
     }
 
-    nav ul li a:hover {
-        background-color: #333;
-        border-radius: 5px;
+    .product-info h3 {
+      font-size: 22px;
+      color: #333;
+      margin-bottom: 10px;
     }
 
-    /* Section Styles */
-    section {
-        padding: 20px;
-        max-width: 1200px;
-        margin: 20px auto;
-    }
-
-    /* Table Styles */
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        background-color: white;
-        border-radius: 5px;
-        overflow: hidden;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    }
-
-    th, td {
-        padding: 15px;
-        text-align: left;
-        border-bottom: 1px solid #ddd;
-    }
-
-    th {
-        background-color: #333;
-        color: white;
-    }
-
-    tr:hover {
-        background-color: #f1f1f1;
-    }
-
-    /* Button Styles */
-    button {
-        background-color: #333;
-        color: white;
-        border: none;
-        padding: 10px 15px;
-        border-radius: 5px;
-        cursor: pointer;
-        transition: background-color 0.3s;
-        font-size: 14px;
-    }
-
-    button:hover {
-        background-color: #555;
-    }
-
-    /* Edit Button Styles */
-    button.edit {
-        background-color: #28a745;
-    }
-
-    button.edit:hover {
-        background-color: #218838;
-    }
-
-    /* Delete Button Styles */
-    button.delete {
-        background-color: #dc3545;
-    }
-
-    button.delete:hover {
-        background-color: #c82333;
-    }
-
-    /* Image Styles */
-    img {
-        max-width: 80px;
-        height: auto;
-        border-radius: 5px;
-    }
-
-    /* Form Styles */
-    form {
-        margin-bottom: 20px;
-        padding: 20px;
-        background-color: white;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    }
-
-    label {
-        display: block;
-        margin-bottom: 8px;
-        font-weight: bold;
-    }
-
-    input, select {
-        width: calc(100% - 16px);
-        padding: 10px;
-        margin-bottom: 15px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-    }
-
-    .form-group {
-        margin-bottom: 20px;
-    }
-
-    /* Footer Styles */
     footer {
-        text-align: center;
-        padding: 10px;
-        background-color: #333;
-        color: white;
-        position: relative;
-        bottom: 0;
-        width: 100%;
-        margin-top: 20px;
+      background-color: #06782c;
+      margin-top: 20px;
+      text-align: center;
+      padding: 10px;
+      color: white;
     }
-</style>
+    
+    /* Product Card Styles */
+    .product-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #fff;
+      border-radius: 15px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      max-width: 280px;
+      margin: 20px;
+      overflow: hidden;
+      transition: transform 0.3s ease-in-out;
+    }
 
+    .product-card:hover {
+      transform: scale(1.05);
+    }
+
+    .product-image img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 10px;
+      object-fit: cover;
+    }
+
+    .product-info {
+      text-align: center;
+      padding: 10px;
+    }
+
+    .product-info h3 {
+      font-size: 18px;
+      color: #333;
+      margin-bottom: 10px;
+    }
+
+    .product-info p {
+      font-size: 14px;
+      color: #555;
+      margin-bottom: 20px;
+    }
+
+    button.view-details {
+      padding: 10px 20px;
+      background-color: #06782c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button.view-details:hover {
+      background-color: #005d1d;
+    }
+
+    /* Section Styling */
+    .category-section {
+      text-align: center;
+      margin: 30px 0;
+    }
+
+    .category-section h2 {
+      font-size: 24px;
+      margin-bottom: 15px;
+    }
+
+    #categorySelect {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    /* Products grid layout */
+    .products-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .products-grid .product-card {
+      flex: 1 0 250px; /* Grow and shrink, but take up a minimum of 250px width */
+      margin: 15px;
+      box-sizing: border-box;
+    }
+
+  </style>
 </head>
 <body>
-<nav>
-<header>
-    <h1>Product Management</h1>
-    <ul>
-        <li><a href="index2.php">Dashboard</a></li>
-        <li><a href="products.php">Product Management</a></li>
-        <li><a href="stock.php">Stock Management</a></li>
-        <li><a href="order.php">Order Mangement</a></li>   
-        <li><a href="user.php">User Mangement</a></li> 
-        <li><a href="priscription.php">Prescription Mangement</a></li>
-        <li><a href="contact.php">Contact Mangement</a></li>   
-        <li><a href="logout.php">Logout</a></li>
-    </ul>
-</header>
-</nav>
+  <?php
+  session_start(); 
 
-<section>
-    <h2>Manage Products</h2>
-    <form method="POST" enctype="multipart/form-data">
-        <div class="form-group">
-            <label for="name">Product Name</label>
-            <input type="text" id="name" name="name" value="<?= isset($productToEdit) ? $productToEdit['name'] : '' ?>" required>
-        </div>
-        <div class="form-group">
-            <label for="price">Price</label>
-            <input type="number" id="price" name="price" value="<?= isset($productToEdit) ? $productToEdit['price'] : '' ?>" required>
-        </div>
-        <div class="form-group">
-            <label for="stock">Stock</label>
-            <input type="number" id="stock" name="stock" value="<?= isset($productToEdit) ? $productToEdit['stock'] : '' ?>" required>
-        </div>
-        <div class="form-group">
-            <label for="category">Category</label>
-            <select id="category" name="category">
-                <option value="Electronics" <?= isset($productToEdit) && $productToEdit['category'] == 'Electronics' ? 'selected' : '' ?>>Electronics</option>
-                <option value="Clothing" <?= isset($productToEdit) && $productToEdit['category'] == 'Clothing' ? 'selected' : '' ?>>Clothing</option>
-                <option value="Accessories" <?= isset($productToEdit) && $productToEdit['category'] == 'Accessories' ? 'selected' : '' ?>>Accessories</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="discount">Discounted Price</label>
-            <input type="number" id="discount" name="discount" value="<?= isset($productToEdit) ? $productToEdit['discounted_price'] : '' ?>">
-        </div>
-        <div class="form-group">
-            <label for="image">Product Image</label>
-            <input type="file" id="image" name="image" accept="image/*">
-        </div>
-        <div class="form-group">
-            <label for="requires_priscription">Requires Prescription</label>
-            <input type="checkbox" id="requires_priscription" name="requires_priscription" <?= isset($productToEdit) && $productToEdit['requires_priscription'] == 1 ? 'checked' : '' ?>>
-        </div>
+  $isLoggedIn = isset($_SESSION['uid']); // Check if user is logged in
 
-        <input type="hidden" name="action" value="<?= isset($productToEdit) ? 'update' : 'add' ?>">
-        <?= isset($productToEdit) ? '<input type="hidden" name="id" value="' . $productToEdit['id'] . '">' : '' ?>
 
-        <button type="submit"><?= isset($productToEdit) ? 'Update Product' : 'Add Product' ?></button>
-    </form>
+  // Navbar
+  echo '<header><div class="navbar"><h1 class="logo">MediCare</h1><nav><ul>
+    <li><a href="index1.php">Home</a></li>
+    <li><a href="products.php">Products</a></li>
+    <li><a href="aboutus.php">About Us</a></li>
+    <li><a href="contact.php">Contact</a></li>
+    <li><a href="Add_to_cart.php">Add to Cart</a></li>
+    <li><a href="profile.php">Profile</a></li>';
 
-    <h3>Product List</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Product Name</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Category</th>
-                <th>Discount</th>
-                <th>Image</th>
-                <th>Requires Prescription</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($products as $product): ?>
-                <tr>
-                    <td><?= htmlspecialchars($product['name']) ?></td>
-                    <td><?= htmlspecialchars($product['price']) ?></td>
-                    <td><?= htmlspecialchars($product['stock']) ?></td>
-                    <td><?= htmlspecialchars($product['category']) ?></td>
-                    <td><?= htmlspecialchars($product['discounted_price']) ?></td>
-                    <td><img src="<?= "../".$product['image'] ?>" alt="Image"></td>
-                    <td><?= $product['requires_priscription'] == 1 ? 'Yes' : 'No' ?></td>
-                    <td>
-                        <form method="POST" style="display:inline;">
-                            <input type="hidden" name="id" value="<?= $product['id'] ?>">
-                            <input type="hidden" name="action" value="edit">
-                            <button type="submit">Edit</button>
-                        </form>
-                        <form method="POST" style="display:inline;">
-                            <input type="hidden" name="id" value="<?= $product['id'] ?>">
-                            <input type="hidden" name="action" value="delete">
-                            <button type="submit" class="delete">Delete</button>
-                        </form>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-</section>
+    if ($isLoggedIn) {
+        echo '<li><a href="logout.php">Logout</a></li>';
+    } else {
+        echo '<li><a href="http://localhost/Project/medicare/medicare-main/Login/login.php">Login</a></li>';
+    }
 
-<footer>
-    <p>&copy; 2024 Medico Shop. All Rights Reserved.</p>
-</footer>
+    echo '</ul></nav></div></header>';
 
+  // Database connection
+  $servername = "localhost"; 
+  $username = "root"; 
+  $password = ""; 
+  $dbname = "medico_shop"; 
+
+  $conn = new mysqli($servername, $username, $password, $dbname);
+
+  if ($conn->connect_error) {
+      die("Connection failed: " . $conn->connect_error);
+  }
+
+  // Get category from query parameter
+  $category = isset($_GET['category']) ? $conn->real_escape_string($_GET['category']) : 'all';
+  if ($category === 'all') {
+      $sql = "SELECT * FROM products";
+  } else {
+      $sql = "SELECT * FROM products WHERE category='$category'";
+  }
+
+  $result = $conn->query($sql);
+
+  echo '<section class="category-section">
+          <h2>Select Category</h2>
+          <select id="categorySelect">
+            <option value="all">All Products</option>
+            <option value="Skin Care">Skin Care</option>
+            <option value="Tabletes">Tabletes</option>
+            <option value="Syrup">Syrup</option>
+            <option value="Baby Products">Baby Products</option>
+          </select>
+        </section>';
+
+  echo '<section class="products-section"><h2>Products</h2><div class="products-grid">';
+
+  if ($result && $result->num_rows > 0) {
+      while ($row = $result->fetch_assoc()) {
+          $actualPrice = $row['price'];
+          $discountedPrice = isset($row['discounted_price']) && $row['discounted_price'] < $row['price'] ? $row['discounted_price'] : null;
+          $finalPrice = $discountedPrice ? number_format($actualPrice - $discountedPrice, 2) : null;
+
+          echo "<div class='product-card'>
+                  <img src='../" . htmlspecialchars($row['image'], ENT_QUOTES) . "' alt='" . htmlspecialchars($row['name'], ENT_QUOTES) . "' class='product-image' />
+                  <div class='product-info'>
+                    <h3>" . htmlspecialchars($row['name'], ENT_QUOTES) . "</h3>
+                    <p>";
+
+          if ($finalPrice) {
+              echo "<span class='original-price'>₹" . number_format($actualPrice, 2) . "</span>";
+              echo "<span class='final-price'>₹" . $finalPrice . "</span>";
+          } else {
+              echo "<span class='final-price'>₹" . number_format($actualPrice, 2) . "</span>";
+          }
+
+          echo "<button class='btn view-details' onclick='viewDetails(\"" . htmlspecialchars($row['id'], ENT_QUOTES) . "\")'>View Details</button>
+                </div>
+              </div>";
+      }
+  } else {
+      echo "<p>No products available.</p>";
+  }
+
+  $conn->close();
+
+  echo '</div></section>';
+
+  // Modal for image viewing
+  echo '<div id="myModal" class="modal">
+          <span class="close" onclick="closeModal()">&times;</span>
+          <img class="modal-content" id="img01">
+        </div>';
+
+  // JavaScript for modal
+  echo '<script>
+          function viewDetails(productId) {
+            window.location.href = "product_details.php?id=" + productId;
+          }
+          const categorySelect = document.getElementById("categorySelect");
+          categorySelect.addEventListener("change", function() {
+            window.location.href = "?category=" + categorySelect.value;
+          });
+        </script>';
+  ?>
+
+  <footer>
+    <p>&copy; 2024 MediCare. All rights reserved.</p>
+  </footer>
 </body>
 </html>
