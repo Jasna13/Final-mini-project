@@ -1,0 +1,98 @@
+<link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+        header {
+            background-color: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        nav ul li {
+            display: inline;
+            margin-right: 15px;
+        }
+        nav ul li a {
+            color: white;
+            text-decoration: none;
+        }
+        section {
+            padding: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        button {
+            background-color: #444;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius:5px;
+            margin-right:10px;
+            cursor: pointer;
+        }
+        .button:hover{
+            background-color:#666;
+        }
+        button.update {
+            background-color: #337ab7;
+        }
+        button.delete {
+            background-color: #d9534f;
+        }
+        img {
+            max-width: 100px;
+            height: auto;
+        }
+        form {
+            margin-bottom: 20px;
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Product Management</h1>
+    <nav>
+        <ul>
+            <li><a href="index.php">Dashboard</a></li>
+            <li><a href="products.php">Product Management</a></li>
+            <li><a href="stock.php">Stock Management</a></li>
+            <li><a href="staff.php">Staff Management</a></li>
+            <li><a href="order.html">Order Management</a></li>
+        </ul>
+    </nav>
+</header>
